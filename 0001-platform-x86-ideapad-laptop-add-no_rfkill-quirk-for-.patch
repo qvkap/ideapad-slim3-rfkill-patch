@@ -1,0 +1,99 @@
+From 52ffa0899f0fd8914ee64ea91ddd5071b68ff00e Mon Sep 17 00:00:00 2001
+From: qvkap <qvkapp@gmail.com>
+Date: Tue, 15 Sep 2026 16:01:20 +0300
+Subject: [PATCH] platform/x86: ideapad-laptop: add no_rfkill quirk for IdeaPad
+ Slim 3 16IRH10
+
+On newer IdeaPad models such as the IdeaPad Slim 3 16IRH10, the EC/ACPI
+firmware reports erratic rfkill radio states through VPCCMD_R_WIFI /
+VPCCMD_R_RF, causing periodic soft/hard blocks of the native
+Wi-Fi/Bluetooth interfaces (e.g. iwlwifi) without user interaction
+or any physical hardware switch.
+
+Introduce a 'no_rfkill' module parameter and a corresponding
+'no_rfkill_list' DMI quirk table to skip registering ACPI rfkill
+devices on laptops where firmware-managed rfkill is defective and
+pure native hardware control is preferred. Add the Lenovo IdeaPad
+Slim 3 16IRH10 to this quirk list.
+
+Signed-off-by: qvkap <qvkapp@gmail.com>
+---
+ drivers/platform/x86/lenovo/ideapad-laptop.c | 33 +++++++++++++++++---
+ 1 file changed, 29 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/platform/x86/lenovo/ideapad-laptop.c b/drivers/platform/x86/lenovo/ideapad-laptop.c
+index 821352450..0b3342ed2 100644
+--- a/drivers/platform/x86/lenovo/ideapad-laptop.c
++++ b/drivers/platform/x86/lenovo/ideapad-laptop.c
+@@ -198,6 +198,7 @@ struct ideapad_private {
+ 		bool ctrl_ps2_aux_port    : 1;
+ 		bool usb_charging         : 1;
+ 		bool ymc_ec_trigger       : 1;
++		bool no_rfkill            : 1;
+ 	} features;
+ 	struct {
+ 		bool initialized;
+@@ -216,6 +217,10 @@ static bool no_bt_rfkill;
+ module_param(no_bt_rfkill, bool, 0444);
+ MODULE_PARM_DESC(no_bt_rfkill, "No rfkill for bluetooth.");
+ 
++static bool no_rfkill;
++module_param(no_rfkill, bool, 0444);
++MODULE_PARM_DESC(no_rfkill, "No rfkill at all, do not create ideapad_wlan/ideapad_bluetooth devices.");
++
+ static bool allow_v4_dytc;
+ module_param(allow_v4_dytc, bool, 0444);
+ MODULE_PARM_DESC(allow_v4_dytc,
+@@ -2015,6 +2020,22 @@ static const struct dmi_system_id hw_rfkill_list[] = {
+ 	{}
+ };
+ 
++/*
++ * On some newer models (like IdeaPad Slim 3 16IRH10), registering ACPI rfkill
++ * causes bogus radio state updates and unwanted soft/hard blocks.
++ * Skip registering rfkill devices for these laptops.
++ */
++static const struct dmi_system_id no_rfkill_list[] = {
++	{
++		.ident = "Lenovo IdeaPad Slim 3 16IRH10",
++		.matches = {
++			DMI_MATCH(DMI_SYS_VENDOR, "LENOVO"),
++			DMI_MATCH(DMI_PRODUCT_VERSION, "IdeaPad Slim 3 16IRH10"),
++		},
++	},
++	{}
++};
++
+ /*
+  * On some models the EC toggles the touchpad muted LED on touchpad toggle
+  * hotkey presses, but the EC does not actually disable the touchpad itself.
+@@ -2178,6 +2199,8 @@ static int ideapad_check_features(struct ideapad_private *priv)
+ 	priv->features.touchpad_ctrl_via_ec = touchpad_ctrl_via_ec;
+ 	priv->features.ymc_ec_trigger =
+ 		ymc_ec_trigger || dmi_check_system(ymc_ec_trigger_quirk_dmi_table);
++	priv->features.no_rfkill =
++		no_rfkill || dmi_check_system(no_rfkill_list);
+ 
+ 	if (!read_ec_data(handle, VPCCMD_R_FAN, &val))
+ 		priv->features.fan_mode = true;
+@@ -2425,11 +2448,13 @@ static int ideapad_acpi_add(struct platform_device *pdev)
+ 	if (!priv->features.hw_rfkill_switch)
+ 		write_ec_cmd(priv->adev->handle, VPCCMD_W_RF, 1);
+ 
+-	for (i = 0; i < IDEAPAD_RFKILL_DEV_NUM; i++)
+-		if (test_bit(ideapad_rfk_data[i].cfgbit, &priv->cfg))
+-			ideapad_register_rfkill(priv, i);
++	if (!priv->features.no_rfkill) {
++		for (i = 0; i < IDEAPAD_RFKILL_DEV_NUM; i++)
++			if (test_bit(ideapad_rfk_data[i].cfgbit, &priv->cfg))
++				ideapad_register_rfkill(priv, i);
+ 
+-	ideapad_sync_rfk_state(priv);
++		ideapad_sync_rfk_state(priv);
++	}
+ 	ideapad_sync_touchpad_state(priv, false);
+ 
+ 	err = ideapad_dytc_profile_init(priv);
+-- 
+2.56.0
+
