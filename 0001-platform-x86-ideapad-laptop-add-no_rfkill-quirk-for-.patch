@@ -1,7 +1,7 @@
 From 52ffa0899f0fd8914ee64ea91ddd5071b68ff00e Mon Sep 17 00:00:00 2001
-From: qvkap <qvkapp@gmail.com>
+From: Ivan Vasilchenko <qvkapp@gmail.com>
 Date: Tue, 15 Sep 2026 16:01:20 +0300
-Subject: [PATCH] platform/x86: ideapad-laptop: add no_rfkill quirk for IdeaPad
+Subject: [PATCH v2] platform/x86: ideapad-laptop: add no_rfkill quirk for IdeaPad
  Slim 3 16IRH10
 
 On newer IdeaPad models such as the IdeaPad Slim 3 16IRH10, the EC/ACPI
@@ -16,8 +16,11 @@ devices on laptops where firmware-managed rfkill is defective and
 pure native hardware control is preferred. Add the Lenovo IdeaPad
 Slim 3 16IRH10 to this quirk list.
 
-Signed-off-by: qvkap <qvkapp@gmail.com>
+Signed-off-by: Ivan Vasilchenko <qvkapp@gmail.com>
 ---
+v2:
+  - Submit patch inline instead of linking to external repository.
+  - Use real name in Signed-off-by according to submitting-patches.rst.
  drivers/platform/x86/lenovo/ideapad-laptop.c | 33 +++++++++++++++++---
  1 file changed, 29 insertions(+), 4 deletions(-)
 
